@@ -102,6 +102,37 @@ static bool a1fs_is_present(void *image)
 
 
 /**
+ * Set a bit in a bitmap
+ *
+ * @param bitmap
+ * @param bit_x
+ * @param target
+ */
+static void set_bit(void *bitmap, unsigned int bit_x, unsigned int target)
+{
+	unsigned int byte_x = bit_x / 8;
+	bit_x = bit_x % 8;
+
+	if (target == 0){
+		*((unsigned char *) (bitmap + byte_x)) &= ~(1 << bit_x);
+	} else {
+		*((unsigned char *) (bitmap + byte_x)) |= 1 << bit_x;
+	}
+}
+
+/**
+ * Get the number of blocks an object should take up.
+ *
+ * @param obj_size  size of an object
+ * @return       number of blocks the object should take up.
+ */
+static int get_block_size(unsigned int obj_size)
+{
+	return obj_size/A1FS_BLOCK_SIZE + (obj_size % A1FS_BLOCK_SIZE != 0);
+}
+
+
+/**
  * Format the image into a1fs.
  *
  * NOTE: Must update mtime of the root directory.
@@ -165,8 +196,9 @@ static bool mkfs(void *image, size_t size, mkfs_opts *opts)
 	root_inode->mode = S_IFDIR | 0777;
 	clock_gettime(CLOCK_REALTIME, &(root_inode->mtime));
 
-	set_bit(superblock->s_inode_bitmap, 0, 1);
+	set_bit(image + superblock->s_inode_bitmap*A1FS_BLOCK_SIZE, 0, 1);
 
+	//make directory block
 	a1fs_dentry* root_dir = image + A1FS_BLOCK_SIZE*(superblock->s_first_data_block);
 	root_dir[0].ino = 0;
 	strcpy(root_dir[0].name, ".");
@@ -175,36 +207,9 @@ static bool mkfs(void *image, size_t size, mkfs_opts *opts)
 	root_inode->links = 2;
 	root_inode->size = sizeof(a1fs_dentry) * 2;
 
+	set_bit(image + superblock->s_block_bitmap*A1FS_BLOCK_SIZE, 0, 1);
+
 	return true;
-}
-
-/**
- * Set a bit in a bitmap
- *
- * @param bitmap  size of an object
- * @return       number of blocks the inode table should take up.
- */
-static void set_bit(void *bitmap, unsigned int bit_x, unsigned int target)
-{
-	unsigned int byte_x = bit_x / 8;
-	bit_x = bit_x % 8;
-
-	if (target == 0){
-		*((unsigned char *) (bitmap + byte_x)) &= ~(1 << bit_x);
-	} else {
-		*((unsigned char *) (bitmap + byte_x)) |= 1 << bit_x;
-	}
-}
-
-/**
- * Get the number of blocks an object should take up.
- *
- * @param obj_size  size of an object
- * @return       number of blocks the inode table should take up.
- */
-static int get_block_size(unsigned int obj_size)
-{
-	return obj_size/A1FS_BLOCK_SIZE + (obj_size % A1FS_BLOCK_SIZE != 0);
 }
 
 
