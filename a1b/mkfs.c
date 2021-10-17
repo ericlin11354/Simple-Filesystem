@@ -203,13 +203,6 @@ static bool mkfs(void *image, size_t size, mkfs_opts *opts)
 	superblock->s_free_blocks_count = data_bsize - 1;
 	set_bit((char*)image + superblock->s_block_bitmap*A1FS_BLOCK_SIZE, 0, 1);
 
-	// struct stat st = {0};
-	// if (stat(opts->img_path, &st) == -1)
-	// 	mkdir(opts->img_path, S_IFDIR | 0777);
-	// else {
-	// 	printf("2"); return false;
-	// }
-
 	return true;
 }
 
