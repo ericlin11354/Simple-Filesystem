@@ -97,7 +97,10 @@ static bool a1fs_is_present(void *image)
 {
 	//TODO: check if the image already contains a valid a1fs superblock
 	(void)image;
-	return true;
+	struct a1fs_superblock *sb = (struct a1fs_superblock *)(image + A1FS_BLOCK_SIZE);
+	if (sb->magic == A1FS_MAGIC)
+		return true;
+	return false;
 }
 
 
@@ -119,7 +122,42 @@ static bool mkfs(void *image, size_t size, mkfs_opts *opts)
 	(void)image;
 	(void)size;
 	(void)opts;
-	return false;
+	struct a1fs_superblock *sb = (struct a1fs_superblock *)(image + A1FS_BLOCK_SIZE);
+	sb->size = size;
+	sb->magic = A1FS_MAGIC;
+
+	sb->s_inodes_count = opts->n_inodes;
+	sb->s_blocks_count = size / A1FS_BLOCK_SIZE;
+	if (sb->s_blocks_count < 5) {
+		fprintf(stderr, "File system too small");
+		return false;
+	}
+
+	sb->s_inode_size = 128;
+	unsigned int temp = opts->n_inodes % (size / sb->s_inode_size) != 0;
+	unsigned int inode_table_size = ((opts->n_inodes / 
+									(size / sb->s_inode_size)) + temp) * A1FS_BLOCK_SIZE;  
+
+	sb->s_r_blocks_count = 0;
+
+	sb->s_free_blocks_count = (size - A1FS_BLOCK_SIZE * 3 - inode_table_size) / A1FS_BLOCK_SIZE;
+	sb->s_free_inodes_count = opts->n_inodes;
+
+	sb->s_first_data_block = 4 + inode_table_size;
+
+	// NOT SURE
+	sb->s_first_ino = 0 ;
+
+	sb->s_block_bitmap = 3;
+	sb->s_inode_bitmap = 2;
+	sb->s_inode_table =  4;
+
+	struct stat st = {0}; // check if directory exists
+	if (stat(opts->img_path, &st) == -1 ) 
+		mkdir(opts->img_path, S_IFDIR | 0777);
+
+
+	return true;
 }
 
 
