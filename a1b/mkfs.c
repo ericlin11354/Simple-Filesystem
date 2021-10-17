@@ -157,12 +157,12 @@ static bool mkfs(void *image, size_t size, mkfs_opts *opts)
 	superblock->size = size;
 
 	unsigned int total_blocks_count = size / A1FS_BLOCK_SIZE;
-	if (total_blocks_count < 5){ return false; }
+	if (total_blocks_count < 5){ printf("1"); return false; }
 
 	struct stat st = {0};
 	if (stat(opts->img_path, &st) == -1)
 		mkdir(opts->img_path, S_IFDIR | 0777);
-	else return false;
+	else printf("2"); return false;
 	
 	unsigned int inode_table_bsize = get_block_size(opts->n_inodes * sizeof(a1fs_inode));
 	unsigned int inode_bitmap_bsize = get_block_size(opts->n_inodes / 8 + (opts->n_inodes % 8 != 0));
