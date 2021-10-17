@@ -116,6 +116,14 @@ static int a1fs_statfs(const char *path, struct statvfs *st)
 	st->f_bsize   = A1FS_BLOCK_SIZE;
 	st->f_frsize  = A1FS_BLOCK_SIZE;
 	//TODO: fill in the rest of required fields based on the information stored
+	a1fs_superblock* superblock = fs->image;
+	st->f_blocks = superblock->s_blocks_count;
+	st->f_bfree = superblock->s_free_blocks_count;
+	st->f_bavail = superblock->s_free_blocks_count;
+	
+	st->f_files = superblock->s_inodes_count;
+	st->f_ffree = superblock->s_free_inodes_count;
+	st->f_favail = superblock->s_free_inodes_count;
 	// in the superblock
 	(void)fs;
 	st->f_namemax = A1FS_NAME_MAX;

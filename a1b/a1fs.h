@@ -53,7 +53,8 @@ typedef struct a1fs_superblock {
 
 	//TODO: add necessary fields
 	unsigned int  s_inodes_count;      /* Inodes count */
-	unsigned int  s_blocks_count;      /* Data Blocks count */
+	unsigned int  s_blocks_count;      /* Total Blocks count */
+	unsigned int  s_d_blocks_count;    /* Data Blocks count */
 	unsigned int  s_r_blocks_count;    /* Reserved blocks count */
 	unsigned int  s_free_blocks_count; /* Free blocks count */
 	unsigned int  s_free_inodes_count; /* Free inodes count */

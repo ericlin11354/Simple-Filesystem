@@ -108,7 +108,7 @@ static bool a1fs_is_present(void *image)
  * @param bit_x
  * @param target
  */
-static void set_bit(void *bitmap, unsigned int bit_x, unsigned int target)
+static void set_bit(char *bitmap, unsigned int bit_x, unsigned int target)
 {
 	unsigned int byte_x = bit_x / 8;
 	bit_x = bit_x % 8;
@@ -147,9 +147,6 @@ static bool mkfs(void *image, size_t size, mkfs_opts *opts)
 {
 	//TODO: initialize the superblock and create an empty root directory
 	//NOTE: the mode of the root directory inode should be set to S_IFDIR | 0777
-	(void)image;
-	(void)size;
-	(void)opts;
 
 	//init struct members
 	a1fs_superblock* superblock = image;
@@ -158,11 +155,6 @@ static bool mkfs(void *image, size_t size, mkfs_opts *opts)
 
 	unsigned int total_blocks_count = size / A1FS_BLOCK_SIZE;
 	if (total_blocks_count < 5){ printf("1"); return false; }
-
-	struct stat st = {0};
-	if (stat(opts->img_path, &st) == -1)
-		mkdir(opts->img_path, S_IFDIR | 0777);
-	else printf("2"); return false;
 	
 	unsigned int inode_table_bsize = get_block_size(opts->n_inodes * sizeof(a1fs_inode));
 	unsigned int inode_bitmap_bsize = get_block_size(opts->n_inodes / 8 + (opts->n_inodes % 8 != 0));
@@ -176,30 +168,31 @@ static bool mkfs(void *image, size_t size, mkfs_opts *opts)
 
 	superblock->s_inode_bitmap = 1;
 	superblock->s_block_bitmap = 1 + inode_bitmap_bsize;
-	//set all bitmap to 0
-	memset(image + A1FS_BLOCK_SIZE, 0, (superblock->s_inode_table - 1)*A1FS_BLOCK_SIZE); 
 
 	superblock->s_inode_table = 1 + inode_bitmap_bsize + data_bitmap_bsize;
+	//set all bitmap to 0
+	memset((char*)image + A1FS_BLOCK_SIZE, 0, (superblock->s_inode_table - 1)*A1FS_BLOCK_SIZE); 
+
 	superblock->s_first_data_block = 1 + inode_bitmap_bsize + data_bitmap_bsize + inode_table_bsize;
 
-	superblock->s_blocks_count = data_bsize;
-	superblock->s_free_blocks_count = data_bsize;
+	superblock->s_blocks_count = total_blocks_count;
+	superblock->s_d_blocks_count = data_bsize;
 	superblock->s_r_blocks_count = total_blocks_count - data_bsize;
 	
 	superblock->s_inodes_count = opts->n_inodes;
-	superblock->s_free_inodes_count = opts->n_inodes;
 	superblock->s_inode_size = sizeof(a1fs_inode);
 	superblock->s_first_ino = 1;
 
 	//make root directory
-	a1fs_inode* root_inode = image + A1FS_BLOCK_SIZE*(superblock->s_inode_table);
+	a1fs_inode* root_inode = (void*)((char*)image + A1FS_BLOCK_SIZE*(superblock->s_inode_table));
 	root_inode->mode = S_IFDIR | 0777;
 	clock_gettime(CLOCK_REALTIME, &(root_inode->mtime));
 
-	set_bit(image + superblock->s_inode_bitmap*A1FS_BLOCK_SIZE, 0, 1);
+	superblock->s_free_inodes_count = opts->n_inodes - 1;
+	set_bit((char*)image + superblock->s_inode_bitmap*A1FS_BLOCK_SIZE, 0, 1);
 
 	//make directory block
-	a1fs_dentry* root_dir = image + A1FS_BLOCK_SIZE*(superblock->s_first_data_block);
+	a1fs_dentry* root_dir = (void*)((char*)image + A1FS_BLOCK_SIZE*(superblock->s_first_data_block));
 	root_dir[0].ino = 0;
 	strcpy(root_dir[0].name, ".");
 	root_dir[1].ino = 0;
@@ -207,7 +200,15 @@ static bool mkfs(void *image, size_t size, mkfs_opts *opts)
 	root_inode->links = 2;
 	root_inode->size = sizeof(a1fs_dentry) * 2;
 
-	set_bit(image + superblock->s_block_bitmap*A1FS_BLOCK_SIZE, 0, 1);
+	superblock->s_free_blocks_count = data_bsize - 1;
+	set_bit((char*)image + superblock->s_block_bitmap*A1FS_BLOCK_SIZE, 0, 1);
+
+	// struct stat st = {0};
+	// if (stat(opts->img_path, &st) == -1)
+	// 	mkdir(opts->img_path, S_IFDIR | 0777);
+	// else {
+	// 	printf("2"); return false;
+	// }
 
 	return true;
 }
