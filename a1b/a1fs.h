@@ -52,6 +52,19 @@ typedef struct a1fs_superblock {
 	uint64_t size;
 
 	//TODO: add necessary fields
+	unsigned int  s_inodes_count;      /* Inodes count */
+	unsigned int  s_blocks_count;      /* Data Blocks count */
+	unsigned int  s_r_blocks_count;    /* Reserved blocks count */
+	unsigned int  s_free_blocks_count; /* Free blocks count */
+	unsigned int  s_free_inodes_count; /* Free inodes count */
+
+	unsigned int   s_first_ino;         /* First non-reserved inode */
+	unsigned short s_inode_size;        /* size of inode structure */
+
+	unsigned int   s_inode_bitmap;      /* Inodes bitmap block */
+	unsigned int   s_block_bitmap;      /* Blocks bitmap block */
+	unsigned int   s_inode_table;       /* Inodes table block */
+	unsigned int   s_first_data_block;  /* First Data Block */
 
 } a1fs_superblock;
 
@@ -103,6 +116,9 @@ typedef struct a1fs_inode {
 	// at the end of the struct in order to satisfy the assertion below.
 	// Try to keep the size of this struct minimal, but don't worry about 
 	// the "wasted space" introduced by the required padding.
+
+	struct a1fs_extent i_block[11];   /* List of extents */
+	uint64_t next; // 8 bytes
 
 } a1fs_inode;
 

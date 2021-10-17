@@ -22,6 +22,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "a1fs.h"
 #include "map.h"
@@ -96,8 +97,7 @@ static bool parse_args(int argc, char *argv[], mkfs_opts *opts)
 static bool a1fs_is_present(void *image)
 {
 	//TODO: check if the image already contains a valid a1fs superblock
-	(void)image;
-	return true;
+	return ((a1fs_superblock*)image)->magic == A1FS_MAGIC;
 }
 
 
@@ -119,7 +119,92 @@ static bool mkfs(void *image, size_t size, mkfs_opts *opts)
 	(void)image;
 	(void)size;
 	(void)opts;
-	return false;
+
+	//init struct members
+	a1fs_superblock* superblock = image;
+	superblock->magic = A1FS_MAGIC;
+	superblock->size = size;
+
+	unsigned int total_blocks_count = size / A1FS_BLOCK_SIZE;
+	if (total_blocks_count < 5){ return false; }
+
+	struct stat st = {0};
+	if (stat(opts->img_path, &st) == -1)
+		mkdir(opts->img_path, S_IFDIR | 0777);
+	else return false;
+	
+	unsigned int inode_table_bsize = get_block_size(opts->n_inodes * sizeof(a1fs_inode));
+	unsigned int inode_bitmap_bsize = get_block_size(opts->n_inodes / 8 + (opts->n_inodes % 8 != 0));
+	
+	//data_bitmap_and_data_block_block_size
+	unsigned int  dbitmap_and_dblock_bsize = 
+		total_blocks_count - inode_table_bsize - inode_bitmap_bsize - 1;
+	
+	unsigned int data_bitmap_bsize = get_block_size(dbitmap_and_dblock_bsize / 8 + (dbitmap_and_dblock_bsize % 8 != 0));
+	unsigned int data_bsize = dbitmap_and_dblock_bsize - data_bitmap_bsize;
+
+	superblock->s_inode_bitmap = 1;
+	superblock->s_block_bitmap = 1 + inode_bitmap_bsize;
+	//set all bitmap to 0
+	memset(image + A1FS_BLOCK_SIZE, 0, (superblock->s_inode_table - 1)*A1FS_BLOCK_SIZE); 
+
+	superblock->s_inode_table = 1 + inode_bitmap_bsize + data_bitmap_bsize;
+	superblock->s_first_data_block = 1 + inode_bitmap_bsize + data_bitmap_bsize + inode_table_bsize;
+
+	superblock->s_blocks_count = data_bsize;
+	superblock->s_free_blocks_count = data_bsize;
+	superblock->s_r_blocks_count = total_blocks_count - data_bsize;
+	
+	superblock->s_inodes_count = opts->n_inodes;
+	superblock->s_free_inodes_count = opts->n_inodes;
+	superblock->s_inode_size = sizeof(a1fs_inode);
+	superblock->s_first_ino = 1;
+
+	//make root directory
+	a1fs_inode* root_inode = image + A1FS_BLOCK_SIZE*(superblock->s_inode_table);
+	root_inode->mode = S_IFDIR | 0777;
+	clock_gettime(CLOCK_REALTIME, &(root_inode->mtime));
+
+	set_bit(superblock->s_inode_bitmap, 0, 1);
+
+	a1fs_dentry* root_dir = image + A1FS_BLOCK_SIZE*(superblock->s_first_data_block);
+	root_dir[0].ino = 0;
+	strcpy(root_dir[0].name, ".");
+	root_dir[1].ino = 0;
+	strcpy(root_dir[1].name, "..");
+	root_inode->links = 2;
+	root_inode->size = sizeof(a1fs_dentry) * 2;
+
+	return true;
+}
+
+/**
+ * Set a bit in a bitmap
+ *
+ * @param bitmap  size of an object
+ * @return       number of blocks the inode table should take up.
+ */
+static void set_bit(void *bitmap, unsigned int bit_x, unsigned int target)
+{
+	unsigned int byte_x = bit_x / 8;
+	bit_x = bit_x % 8;
+
+	if (target == 0){
+		*((unsigned char *) (bitmap + byte_x)) &= ~(1 << bit_x);
+	} else {
+		*((unsigned char *) (bitmap + byte_x)) |= 1 << bit_x;
+	}
+}
+
+/**
+ * Get the number of blocks an object should take up.
+ *
+ * @param obj_size  size of an object
+ * @return       number of blocks the inode table should take up.
+ */
+static int get_block_size(unsigned int obj_size)
+{
+	return obj_size/A1FS_BLOCK_SIZE + (obj_size % A1FS_BLOCK_SIZE != 0);
 }
 
 
