@@ -146,16 +146,13 @@ static bool mkfs(void *image, size_t size, mkfs_opts *opts)
 	sb->s_first_data_block = 4 + inode_table_size;
 
 	// NOT SURE
-	sb->s_first_ino = 0 ;
+	sb->s_first_ino = 1;
+	struct a1fs_inode *inodes = (struct a1fs_inode *)(image + A1FS_BLOCK_SIZE * sb->s_inode_table);
+	inodes[0].i_mode = S_IFDIR | 0777;
 
 	sb->s_block_bitmap = 3;
 	sb->s_inode_bitmap = 2;
 	sb->s_inode_table =  4;
-
-	struct stat st = {0}; // check if directory exists
-	if (stat(opts->img_path, &st) == -1 ) 
-		mkdir(opts->img_path, S_IFDIR | 0777);
-
 
 	return true;
 }
