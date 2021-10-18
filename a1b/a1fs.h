@@ -9,7 +9,7 @@
  * Authors: Alexey Khrabrov, Karen Reid
  *
  * All of the files in this directory and all subdirectories are:
- * Copyright (c) 2019, 2021 Karen Reid
+ * Copyright (c) 2019 Karen Reid
  */
 
 /**
@@ -75,7 +75,7 @@ static_assert(sizeof(a1fs_superblock) <= A1FS_BLOCK_SIZE,
 
 
 /** Extent - a contiguous range of blocks. */
-typedef struct a1fs_extent {
+typedef struct a1fs_extent { // 8 bytes
 	/** Starting block of the extent. */
 	a1fs_blk_t start;
 	/** Number of blocks in the extent. */
@@ -87,7 +87,7 @@ typedef struct a1fs_extent {
 /** a1fs inode. */
 typedef struct a1fs_inode {
 	/** File mode. */
-	mode_t mode;
+	mode_t mode; // 4 bytes
 
 	/**
 	 * Reference count (number of hard links).
@@ -97,28 +97,28 @@ typedef struct a1fs_inode {
 	 * subdirectory (via ".."). The "parent directory" of the root directory
 	 * is the root directory itself.
 	 */
-	uint32_t links;
+	uint32_t links; // 4 bytes
 
 	/** File size in bytes. */
-	uint64_t size;
+	uint64_t size; // 8 bytes
 
 	/**
 	 * Last modification timestamp.
 	 *
 	 * Must be updated when the file (or directory) is created, written to,
-	 * or its size changes. Use the clock_gettime() function from time.h
+	 * or its size changes. Use the clock_gettime() function from time.h 
 	 * with the CLOCK_REALTIME clock; see "man 3 clock_gettime" for details.
 	 */
-	struct timespec mtime;
+	struct timespec mtime; //8 bytes
 
 	//TODO: add necessary fields
 
-	// NOTE: You might have to add padding (e.g. a dummy char array field)
-	// at the end of the struct in order to satisfy the assertion below.
+	// NOTE: You might have to add padding (e.g. a dummy char array field) 
+	// at the end of the struct in order to satisfy the assertion below. 
 	// Try to keep the size of this struct minimal, but don't worry about 
 	// the "wasted space" introduced by the required padding.
 
-	struct a1fs_extent i_block[11];   /* List of extents */
+	struct a1fs_extent  i_block[11];   /* List of extents */
 	uint64_t next; // 8 bytes
 
 } a1fs_inode;
