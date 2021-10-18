@@ -26,6 +26,7 @@
 
 #include "a1fs.h"
 #include "map.h"
+#include "bits.h"
 
 
 /** Command line options. */
@@ -101,36 +102,6 @@ static bool a1fs_is_present(void *image)
 }
 
 
-/**
- * Set a bit in a bitmap
- *
- * @param bitmap
- * @param bit_x
- * @param target
- */
-static void set_bit(char *bitmap, unsigned int bit_x, unsigned int target)
-{
-	unsigned int byte_x = bit_x / 8;
-	bit_x = bit_x % 8;
-
-	if (target == 0){
-		*((unsigned char *) (bitmap + byte_x)) &= ~(1 << bit_x);
-	} else {
-		*((unsigned char *) (bitmap + byte_x)) |= 1 << bit_x;
-	}
-}
-
-/**
- * Get the number of blocks an object should take up.
- *
- * @param obj_size  size of an object
- * @return       number of blocks the object should take up.
- */
-static int get_block_size(unsigned int obj_size)
-{
-	return obj_size/A1FS_BLOCK_SIZE + (obj_size % A1FS_BLOCK_SIZE != 0);
-}
-
 
 /**
  * Format the image into a1fs.
@@ -156,6 +127,7 @@ static bool mkfs(void *image, size_t size, mkfs_opts *opts)
 	unsigned int total_blocks_count = size / A1FS_BLOCK_SIZE;
 	if (total_blocks_count < 5){ printf("1"); return false; }
 	
+	//bsize = block size
 	unsigned int inode_table_bsize = get_block_size(opts->n_inodes * sizeof(a1fs_inode));
 	unsigned int inode_bitmap_bsize = get_block_size(opts->n_inodes / 8 + (opts->n_inodes % 8 != 0));
 	
@@ -184,7 +156,7 @@ static bool mkfs(void *image, size_t size, mkfs_opts *opts)
 	superblock->s_first_ino = 1;
 
 	//make root directory
-	a1fs_inode* root_inode = (void*)((char*)image + A1FS_BLOCK_SIZE*(superblock->s_inode_table));
+	a1fs_inode* root_inode = (a1fs_inode*)((char*)image + A1FS_BLOCK_SIZE*(superblock->s_inode_table));
 	root_inode->mode = S_IFDIR | 0777;
 	clock_gettime(CLOCK_REALTIME, &(root_inode->mtime));
 
@@ -192,13 +164,16 @@ static bool mkfs(void *image, size_t size, mkfs_opts *opts)
 	set_bit((char*)image + superblock->s_inode_bitmap*A1FS_BLOCK_SIZE, 0, 1);
 
 	//make directory block
-	a1fs_dentry* root_dir = (void*)((char*)image + A1FS_BLOCK_SIZE*(superblock->s_first_data_block));
+	a1fs_dentry* root_dir = (a1fs_dentry*)((char*)image + A1FS_BLOCK_SIZE*(superblock->s_first_data_block));
 	root_dir[0].ino = 0;
 	strcpy(root_dir[0].name, ".");
 	root_dir[1].ino = 0;
 	strcpy(root_dir[1].name, "..");
 	root_inode->links = 2;
 	root_inode->size = sizeof(a1fs_dentry) * 2;
+	root_inode->next = 0;
+	root_inode->i_block[0].start = 0;
+	root_inode->i_block[0].count = 1;
 
 	superblock->s_free_blocks_count = data_bsize - 1;
 	set_bit((char*)image + superblock->s_block_bitmap*A1FS_BLOCK_SIZE, 0, 1);
