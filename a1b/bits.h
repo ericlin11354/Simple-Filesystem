@@ -8,9 +8,9 @@
 /**
  * Set a bit in a bitmap
  *
- * @param bitmap	the bit is relative to this pointer
- * @param bit_x		the bit you want to set
- * @param target	zero or one
+ * @param bitmap	bit_x is relative to this pointer
+ * @param bit_x		position of desired bit
+ * @param target	bit_x will be set to this; should be zero or one
  */
 void set_bit(char *bitmap, unsigned int bit_x, unsigned int target)
 {
@@ -27,8 +27,9 @@ void set_bit(char *bitmap, unsigned int bit_x, unsigned int target)
 /**
  * Get a bit in a bitmap
  *
- * @param bitmap	the bit is relative to this pointer
- * @param bit_x		the bit you want to set
+ * @param bitmap	bit_x is relative to this pointer
+ * @param bit_x		position of desired bit
+ * @return          the value of bit_x; should be zero or one
  */
 int get_bit(char *bitmap, unsigned int bit_x)
 {
