@@ -3,6 +3,8 @@
  */
 #pragma once
 
+#include <errno.h>
+
 #include "a1fs.h"
 
 /**
@@ -48,4 +50,82 @@ int get_bit(char *bitmap, unsigned int bit_x)
 int get_block_size(unsigned int obj_size)
 {
 	return obj_size/A1FS_BLOCK_SIZE + (obj_size % A1FS_BLOCK_SIZE != 0);
+}
+
+/**
+ * get the pointer to a data block
+ *
+ * @param img  		ptr to file img start
+ * @param block_n  	offset in number of blocks relative to the first data block
+ * @return       ptr to the start of data block 'block_n'
+ */
+void* get_dblock_address(void *img, unsigned int block_n)
+{
+	a1fs_superblock* superblock = img;
+	return (void*)( (char*)img + (block_n + superblock->s_first_data_block)*A1FS_BLOCK_SIZE );
+}
+
+/**
+ * get the pointer to an inode
+ *
+ * @param img  		ptr to file img start
+ * @param inode_n  	offset in number of inodes relative to the root inode
+ * @return       ptr to the start of inode 'inode_n'
+ */
+a1fs_inode* get_inode_address(void *img, unsigned int inode_n)
+{
+	a1fs_superblock* superblock = img;
+	void *i_table = (char*)img + superblock->s_inode_table * A1FS_BLOCK_SIZE;
+	a1fs_inode* root_inode = (a1fs_inode*)i_table;
+	return (a1fs_inode*)(root_inode + inode_n);
+}
+
+/**
+ * get the inode of the directory
+ *
+ * @param img  				ptr to file img start
+ * @param inode_ptr_ptr  	ptr to inode ptr; inode ptr will be changed on success
+ * @param block_n  			the path whose inode you're looking for
+ * @return       ptr to the inode; -1 on error
+ */
+int get_inode_from_path(void *img, a1fs_inode **inode_ptr_ptr, const char *path)
+{
+	char path_cpy[strlen(path) + 1];
+	strcpy(path_cpy, path);
+
+	// a1fs_superblock* superblock = img;
+	a1fs_inode* root_inode = get_inode_address(img, 0);
+	a1fs_inode* curr_inode = root_inode;
+
+    char *nextDir;
+    nextDir = strtok(path_cpy, "/");
+
+    while (nextDir != NULL)
+    {
+		int num_dirs = root_inode->size/sizeof(a1fs_dentry);
+		int dirs_checked = 0;
+		bool dir_found = false;
+		
+		//TODO: add support for multi extent directories
+		while (dirs_checked < num_dirs){
+			a1fs_dentry *dentries = get_dblock_address(img, curr_inode->i_block[1].start);
+			a1fs_dentry *curr_dentry = &dentries[dirs_checked];
+			if(strcmp(curr_dentry->name, nextDir) == 0){
+				curr_inode = root_inode + curr_dentry->ino;
+				nextDir = strtok (NULL, "/");
+
+				dir_found = true;
+				break;
+			}
+
+			++dirs_checked;
+		}
+
+		if (dir_found) continue;
+
+		return -ENOENT;
+    }
+
+	*inode_ptr_ptr = curr_inode;
+	return 0;
 }

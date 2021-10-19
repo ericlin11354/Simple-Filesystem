@@ -31,6 +31,8 @@
 #include "options.h"
 #include "map.h"
 
+#include "bits.h"
+
 //NOTE: All path arguments are absolute paths within the a1fs file system and
 // start with a '/' that corresponds to the a1fs root directory.
 //
@@ -205,22 +207,27 @@ static int a1fs_getattr(const char *path, struct stat *st)
 static int a1fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                         off_t offset, struct fuse_file_info *fi)
 {
-	(void)offset;// unused
-	(void)fi;// unused
+	(void)offset;
+	(void)fi;
 	fs_ctx *fs = get_fs();
 
-	//NOTE: This is just a placeholder that allows the file system to be mounted
-	// without errors. You should remove this from your implementation.
-	if (strcmp(path, "/") == 0) {
-		filler(buf, "." , NULL, 0);
-		filler(buf, "..", NULL, 0);
-		return 0;
+	//get first inode
+	void *img = fs->image;
+	a1fs_superblock* superblock = img;
+	void *i_table = (char*)img + superblock->s_inode_table * A1FS_BLOCK_SIZE;
+	a1fs_inode* root_inode = (a1fs_inode*)i_table;
+
+	if (strcmp(path, "/") != 0) {
+		return -ENOSYS;
 	}
 
-	//TODO: lookup the directory inode for given path and iterate through its
-	// directory entries
-	(void)fs;
-	return -ENOSYS;
+	a1fs_dentry *dir = get_dblock_address(img, root_inode->i_block[1].start);
+	int num_dirs = root_inode->size/sizeof(a1fs_dentry);
+	for (int i = 0; i < num_dirs; ++i){
+		filler(buf, dir[i].name, NULL, 0);
+	}
+
+	return 0;
 }
 
 
