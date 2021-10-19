@@ -160,7 +160,7 @@ static int a1fs_getattr(const char *path, struct stat *st)
 		//NOTE: all the fields set below are required and must be set according
 		// to the information stored in the corresponding inode
 		st->st_mode = S_IFDIR | 0777;
-		st->st_nlink = 2;
+		st->st_nlink = get_fs().image;
 		st->st_size = 0;
 		st->st_blocks = 0 * A1FS_BLOCK_SIZE / 512;
 		st->st_mtim = (struct timespec){0};
@@ -170,6 +170,8 @@ static int a1fs_getattr(const char *path, struct stat *st)
 	//TODO: lookup the inode for given path and, if it exists, fill in the
 	// required fields based on the information stored in the inode
 	(void)fs;
+
+
 	return -ENOSYS;
 }
 
