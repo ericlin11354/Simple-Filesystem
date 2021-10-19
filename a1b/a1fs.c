@@ -220,7 +220,8 @@ static int a1fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	// if (strcmp(path, "/") != 0) {
 	// 	return -ENOSYS;
 	// }
-	printf('Hello World.\n');
+	(void)path;
+	printf("Hello World.\n");
 
 	a1fs_dentry *dir = get_dblock_address(img, root_inode->i_block[1].start);
 	int num_dirs = root_inode->size/sizeof(a1fs_dentry);
