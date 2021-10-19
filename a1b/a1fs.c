@@ -215,16 +215,13 @@ static int a1fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	void *img = fs->image;
 	a1fs_superblock* superblock = img;
 	void *i_table = (char*)img + superblock->s_inode_table * A1FS_BLOCK_SIZE;
-	a1fs_inode* root_inode = (a1fs_inode*)i_table;
+	// a1fs_inode* root_inode = (a1fs_inode*)i_table;
 
-	// if (strcmp(path, "/") != 0) {
-	// 	return -ENOSYS;
-	// }
-	(void)path;
-	printf("Hello World.\n");
+	a1fs_inode* curr_inode;
+	get_inode_from_path(img, &curr_inode, path);
 
-	a1fs_dentry *dir = get_dblock_address(img, root_inode->i_block[1].start);
-	int num_dirs = root_inode->size/sizeof(a1fs_dentry);
+	a1fs_dentry *dir = get_dblock_address(img, curr_inode->i_block[1].start);
+	int num_dirs = curr_inode->size/sizeof(a1fs_dentry);
 	for (int i = 0; i < num_dirs; ++i){
 		filler(buf, dir[i].name, NULL, 0);
 	}
