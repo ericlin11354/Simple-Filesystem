@@ -31,6 +31,8 @@
 #include "options.h"
 #include "map.h"
 
+#include "bits.h"
+
 //NOTE: All path arguments are absolute paths within the a1fs file system and
 // start with a '/' that corresponds to the a1fs root directory.
 //
@@ -116,11 +118,20 @@ static int a1fs_statfs(const char *path, struct statvfs *st)
 	st->f_bsize   = A1FS_BLOCK_SIZE;
 	st->f_frsize  = A1FS_BLOCK_SIZE;
 	//TODO: fill in the rest of required fields based on the information stored
+	a1fs_superblock* superblock = fs->image;
+	st->f_blocks = superblock->s_blocks_count;
+	st->f_bfree = superblock->s_free_blocks_count;
+	st->f_bavail = superblock->s_free_blocks_count;
+	
+	st->f_files = superblock->s_inodes_count;
+	st->f_ffree = superblock->s_free_inodes_count;
+	st->f_favail = superblock->s_free_inodes_count;
 	// in the superblock
 	(void)fs;
 	st->f_namemax = A1FS_NAME_MAX;
 
-	return -ENOSYS;
+	// return -ENOSYS;
+	return 0;
 }
 
 /**
@@ -153,17 +164,19 @@ static int a1fs_getattr(const char *path, struct stat *st)
 	fs_ctx *fs = get_fs();
 
 	memset(st, 0, sizeof(*st));
-
+	void *img = fs->image;
+	a1fs_inode *inode = get_inode_address(img, st->st_ino);
 	//NOTE: This is just a placeholder that allows the file system to be mounted
 	// without errors. You should remove this from your implementation.
 	if (strcmp(path, "/") == 0) {
 		//NOTE: all the fields set below are required and must be set according
 		// to the information stored in the corresponding inode
 		st->st_mode = S_IFDIR | 0777;
-		st->st_nlink = get_fs().image;
-		st->st_size = 0;
-		st->st_blocks = 0 * A1FS_BLOCK_SIZE / 512;
-		st->st_mtim = (struct timespec){0};
+		st->st_nlink = inode->links;
+		st->st_size = inode->size;
+		// Not sure if gets appropriate correct st_blocks
+		st->st_blocks = get_block_size(inode->size) / 512;
+		st->st_mtim = inode->mtime;
 		return 0;
 	}
 
@@ -198,22 +211,26 @@ static int a1fs_getattr(const char *path, struct stat *st)
 static int a1fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                         off_t offset, struct fuse_file_info *fi)
 {
-	(void)offset;// unused
-	(void)fi;// unused
+	(void)offset;
+	(void)fi;
 	fs_ctx *fs = get_fs();
 
-	//NOTE: This is just a placeholder that allows the file system to be mounted
-	// without errors. You should remove this from your implementation.
-	if (strcmp(path, "/") == 0) {
-		filler(buf, "." , NULL, 0);
-		filler(buf, "..", NULL, 0);
-		return 0;
+	//get first inode
+	void *img = fs->image;
+	//a1fs_superblock* superblock = img;
+	//void *i_table = (char*)img + superblock->s_inode_table * A1FS_BLOCK_SIZE;
+	// a1fs_inode* root_inode = (a1fs_inode*)i_table;
+
+	a1fs_inode* curr_inode;
+	get_inode_from_path(img, &curr_inode, path);
+
+	a1fs_dentry *dir = get_dblock_address(img, curr_inode->i_block[1].start);
+	int num_dirs = curr_inode->size/sizeof(a1fs_dentry);
+	for (int i = 0; i < num_dirs; ++i){
+		filler(buf, dir[i].name, NULL, 0);
 	}
 
-	//TODO: lookup the directory inode for given path and iterate through its
-	// directory entries
-	(void)fs;
-	return -ENOSYS;
+	return 0;
 }
 
 
